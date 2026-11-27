@@ -51,8 +51,6 @@ yolo detect predict model=/path/to/best.pt source=/path/to/images
 
 This repository contains the selected research implementation and its model config. The training command uses the paper's reported 300-epoch schedule.
 
-This implementation samples ground-truth box centers for SCML and adds an auxiliary cosine-alignment term. The paper describes SCML on assigner-selected foreground anchors. The retained YAML most closely matches the paper's reported model size among the checked local configs.
-
 Reproducing the paper's reported scores requires the exact dataset versions and splits, the original model and training configuration, and the paper implementation and software environment. Evaluating the reported trained models also requires their original checkpoints. Obtain datasets and checkpoints separately.
 
 ## Citation
