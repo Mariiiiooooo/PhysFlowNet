@@ -59,17 +59,29 @@ Xueting Liu, Haoyu Ji, Wenze Huang, Zhihao Yang, Yu Gao, Weihong Ren, Zhiyong Wa
 
 
 ```bibtex
-@inproceedings{liu2026physflownet,
-  author    = {Liu, Xueting and Ji, Haoyu and Huang, Wenze and Yang, Zhihao and
-               Gao, Yu and Ren, Weihong and Wang, Zhiyong and Liu, Honghai},
-  title     = {{PhysFlowNet}: Learning Canonical Latent Manifolds via
-               Spatio-Spectral Physics Priors for Underwater Object Detection},
-  booktitle = {Computer Vision -- ECCV 2026},
-  series    = {Lecture Notes in Computer Science},
-  volume    = {17076},
-  pages     = {613--631},
-  year      = {2026},
-  doi       = {10.1007/978-3-032-37038-9_35}
+@InProceedings{10.1007/978-3-032-37038-9_35,
+author="Liu, Xueting
+and Ji, Haoyu
+and Huang, Wenze
+and Yang, Zhihao
+and Gao, Yu
+and Ren, Weihong
+and Wang, Zhiyong
+and Liu, Honghai",
+editor="Favaro, Paolo
+and Kukelova, Zuzana
+and Maki, Atsuto
+and Rohrbach, Anna
+and Schindler, Konrad
+and Tombari, Federico",
+title="PhysFlowNet: Learning Canonical Latent Manifolds via Spatio-Spectral Physics Priors for Underwater Object Detection",
+booktitle="Computer Vision -- ECCV 2026",
+year="2026",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="613--631",
+abstract="Underwater object detection is fundamentally ill-posed due to severe light attenuation and scattering. These physical degradations induce highly non-linear geometric distortions in the visual feature space, deviating significantly from the canonical manifold of clear images and rendering standard Euclidean convolutions suboptimal. To address this, we propose PhysFlowNet, that reformulates representation rectification as a physics-guided geometric evolution on a Riemannian manifold. PhysFlowNet first extracts a joint spatial-frequency physical prior to encapsulate macroscopic scattering mechanics. Conditioned on this prior, we introduce the Parallel Physics-Residual Bottleneck (PPRB), which executes a metric-preconditioned Riemannian feature retraction to transport distorted features back to their canonical states. Moreover, to counteract cascaded smoothing during scale transitions, we introduce a Physics-Guided Manifold Downsampling (PMD) strategy to strictly preserve fine detail textures and structural boundaries. Ultimately, the network is optimized via a Unified Evidential-Contrastive Objective (UECO). Comprising a Supervised Contrastive Manifold Loss (SCML) and an Evidential Uncertainty Regulation (EUR), UECO jointly ensures latent geometric alignment and reliable uncertainty calibration. Extensive evaluations across challenging underwater benchmarks demonstrate that PhysFlowNet achieves state-of-the-art performance, establishing a principled geometric paradigm for physically degraded vision tasks.",
+isbn="978-3-032-37038-9"
 }
 ```
 
