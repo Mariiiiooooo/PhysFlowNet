@@ -42,7 +42,7 @@ def torch2onnx(
         onnx_file,
         verbose=False,
         opset_version=opset,
-        do_constant_folding=True,  # WARNING: DNN inference with torch>=1.12 may require do_constant_folding=False
+        do_constant_folding=True,
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic or None,
@@ -97,21 +97,19 @@ def onnx2engine(
     if verbose:
         logger.min_severity = trt.Logger.Severity.VERBOSE
 
-    # Engine builder
     builder = trt.Builder(logger)
     config = builder.create_builder_config()
     workspace_bytes = int((workspace or 0) * (1 << 30))
-    is_trt10 = int(trt.__version__.split(".", 1)[0]) >= 10  # is TensorRT >= 10
+    is_trt10 = int(trt.__version__.split(".", 1)[0]) >= 10
     if is_trt10 and workspace_bytes > 0:
         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_bytes)
-    elif workspace_bytes > 0:  # TensorRT versions 7, 8
+    elif workspace_bytes > 0:
         config.max_workspace_size = workspace_bytes
     flag = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
     network = builder.create_network(flag)
     half = builder.platform_has_fast_fp16 and half
     int8 = builder.platform_has_fast_int8 and int8
 
-    # Optionally switch to DLA if enabled
     if dla is not None:
         if not IS_JETSON:
             raise ValueError("DLA is only available on NVIDIA Jetson devices")
@@ -124,12 +122,10 @@ def onnx2engine(
         config.DLA_core = int(dla)
         config.set_flag(trt.BuilderFlag.GPU_FALLBACK)
 
-    # Read ONNX file
     parser = trt.OnnxParser(network, logger)
     if not parser.parse_from_file(onnx_file):
         raise RuntimeError(f"failed to load ONNX file: {onnx_file}")
 
-    # Network inputs
     inputs = [network.get_input(i) for i in range(network.num_inputs)]
     outputs = [network.get_output(i) for i in range(network.num_outputs)]
     for inp in inputs:
@@ -139,8 +135,8 @@ def onnx2engine(
 
     if dynamic:
         profile = builder.create_optimization_profile()
-        min_shape = (1, shape[1], 32, 32)  # minimum input shape
-        max_shape = (*shape[:2], *(int(max(2, workspace or 2) * d) for d in shape[2:]))  # max input shape
+        min_shape = (1, shape[1], 32, 32)
+        max_shape = (*shape[:2], *(int(max(2, workspace or 2) * d) for d in shape[2:]))
         for inp in inputs:
             profile.set_shape(inp.name, min=min_shape, opt=shape, max=max_shape)
         config.add_optimization_profile(profile)
@@ -176,7 +172,7 @@ def onnx2engine(
 
             def __init__(
                 self,
-                dataset,  # ultralytics.data.build.InfiniteDataLoader
+                dataset,
                 cache: str = "",
             ) -> None:
                 """Initialize the INT8 calibrator with dataset and cache path."""
@@ -184,7 +180,7 @@ def onnx2engine(
                 self.dataset = dataset
                 self.data_iter = iter(dataset)
                 self.algo = (
-                    trt.CalibrationAlgoType.ENTROPY_CALIBRATION_2  # DLA quantization needs ENTROPY_CALIBRATION_2
+                    trt.CalibrationAlgoType.ENTROPY_CALIBRATION_2
                     if dla is not None
                     else trt.CalibrationAlgoType.MINMAX_CALIBRATION
                 )
@@ -206,7 +202,6 @@ def onnx2engine(
                     im0s = im0s.to("cuda") if im0s.device.type == "cpu" else im0s
                     return [int(im0s.data_ptr())]
                 except StopIteration:
-                    # Return None to signal to TensorRT there is no calibration data remaining
                     return None
 
             def read_calibration_cache(self) -> bytes | None:
@@ -218,7 +213,6 @@ def onnx2engine(
                 """Write calibration cache to disk."""
                 _ = self.cache.write_bytes(cache)
 
-        # Load dataset w/ builder (for batching) and calibrate
         config.int8_calibrator = EngineCalibrator(
             dataset=dataset,
             cache=str(Path(onnx_file).with_suffix(".cache")),
@@ -227,13 +221,10 @@ def onnx2engine(
     elif half:
         config.set_flag(trt.BuilderFlag.FP16)
 
-    # Write file
     build = builder.build_serialized_network if is_trt10 else builder.build_engine
     with build(network, config) as engine, open(engine_file, "wb") as t:
-        # Metadata
         if metadata is not None:
             meta = json.dumps(metadata)
             t.write(len(meta).to_bytes(4, byteorder="little", signed=True))
             t.write(meta.encode())
-        # Model
         t.write(engine if is_trt10 else engine.serialize())

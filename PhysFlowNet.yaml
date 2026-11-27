@@ -1,8 +1,7 @@
 # Ultralytics AGPL-3.0 License - https://ultralytics.com/license
 # Modified for the PhysFlowNet research release on 2026-11-26.
-# PhysFlowNet research architecture for underwater object detection.
 
-nc: 80  # Overridden by dataset class count during training.
+nc: 80
 scale: n
 scales:
   n: [0.50, 0.25, 1024]

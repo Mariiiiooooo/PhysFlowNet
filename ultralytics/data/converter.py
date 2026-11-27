@@ -256,36 +256,28 @@ def convert_coco(
         Convert LVIS annotations to YOLO format
         >>> convert_coco("lvis/annotations/", use_segments=True, use_keypoints=False, cls91to80=False, lvis=True)
     """
-    # Create dataset directory
-    save_dir = increment_path(save_dir)  # increment if save directory already exists
+    save_dir = increment_path(save_dir)
     for p in save_dir / "labels", save_dir / "images":
-        p.mkdir(parents=True, exist_ok=True)  # make dir
+        p.mkdir(parents=True, exist_ok=True)
 
-    # Convert classes
     coco80 = coco91_to_coco80_class()
 
-    # Import json
     for json_file in sorted(Path(labels_dir).resolve().glob("*.json")):
         lname = "" if lvis else json_file.stem.replace("instances_", "")
-        fn = Path(save_dir) / "labels" / lname  # folder name
+        fn = Path(save_dir) / "labels" / lname
         fn.mkdir(parents=True, exist_ok=True)
         if lvis:
-            # NOTE: create folders for both train and val in advance,
-            # since LVIS val set contains images from COCO 2017 train in addition to the COCO 2017 val split.
             (fn / "train2017").mkdir(parents=True, exist_ok=True)
             (fn / "val2017").mkdir(parents=True, exist_ok=True)
         with open(json_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        # Create image dict
         images = {f"{x['id']:d}": x for x in data["images"]}
-        # Create image-annotations dict
         annotations = defaultdict(list)
         for ann in data["annotations"]:
             annotations[ann["image_id"]].append(ann)
 
         image_txt = []
-        # Write labels file
         for img_id, anns in TQDM(annotations.items(), desc=f"Annotations {json_file}"):
             img = images[f"{img_id:d}"]
             h, w = img["height"], img["width"]
@@ -299,15 +291,14 @@ def convert_coco(
             for ann in anns:
                 if ann.get("iscrowd", False):
                     continue
-                # The COCO box format is [top left x, top left y, width, height]
                 box = np.array(ann["bbox"], dtype=np.float64)
-                box[:2] += box[2:] / 2  # xy top-left corner to center
-                box[[0, 2]] /= w  # normalize x
-                box[[1, 3]] /= h  # normalize y
-                if box[2] <= 0 or box[3] <= 0:  # if w <= 0 and h <= 0
+                box[:2] += box[2:] / 2
+                box[[0, 2]] /= w
+                box[[1, 3]] /= h
+                if box[2] <= 0 or box[3] <= 0:
                     continue
 
-                cls = coco80[ann["category_id"] - 1] if cls91to80 else ann["category_id"] - 1  # class
+                cls = coco80[ann["category_id"] - 1] if cls91to80 else ann["category_id"] - 1
                 box = [cls] + box.tolist()
                 if box not in bboxes:
                     bboxes.append(box)
@@ -319,7 +310,7 @@ def convert_coco(
                             s = merge_multi_segment(ann["segmentation"])
                             s = (np.concatenate(s, axis=0) / np.array([w, h])).reshape(-1).tolist()
                         else:
-                            s = [j for i in ann["segmentation"] for j in i]  # all segments concatenated
+                            s = [j for i in ann["segmentation"] for j in i]
                             s = (np.array(s).reshape(-1, 2) / np.array([w, h])).reshape(-1).tolist()
                         s = [cls] + s
                         segments.append(s)
@@ -328,15 +319,14 @@ def convert_coco(
                             box + (np.array(ann["keypoints"]).reshape(-1, 3) / np.array([w, h, 1])).reshape(-1).tolist()
                         )
 
-            # Write
             with open((fn / f).with_suffix(".txt"), "a", encoding="utf-8") as file:
                 for i in range(len(bboxes)):
                     if use_keypoints:
-                        line = (*(keypoints[i]),)  # cls, box, keypoints
+                        line = (*(keypoints[i]),)
                     else:
                         line = (
                             *(segments[i] if use_segments and len(segments[i]) > 0 else bboxes[i]),
-                        )  # cls, box or segments
+                        )
                     file.write(("%g " * len(line)).rstrip() % line + "\n")
 
         if lvis:
@@ -385,36 +375,33 @@ def convert_segment_masks_to_yolo_seg(masks_dir: str, output_dir: str, classes: 
     pixel_to_class_mapping = {i + 1: i for i in range(classes)}
     for mask_path in Path(masks_dir).iterdir():
         if mask_path.suffix in {".png", ".jpg"}:
-            mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)  # Read the mask image in grayscale
-            img_height, img_width = mask.shape  # Get image dimensions
+            mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+            img_height, img_width = mask.shape
             LOGGER.info(f"Processing {mask_path} imgsz = {img_height} x {img_width}")
 
-            unique_values = np.unique(mask)  # Get unique pixel values representing different classes
+            unique_values = np.unique(mask)
             yolo_format_data = []
 
             for value in unique_values:
                 if value == 0:
-                    continue  # Skip background
+                    continue
                 class_index = pixel_to_class_mapping.get(value, -1)
                 if class_index == -1:
                     LOGGER.warning(f"Unknown class for pixel value {value} in file {mask_path}, skipping.")
                     continue
 
-                # Create a binary mask for the current class and find contours
                 contours, _ = cv2.findContours(
                     (mask == value).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-                )  # Find contours
+                )
 
                 for contour in contours:
-                    if len(contour) >= 3:  # YOLO requires at least 3 points for a valid segmentation
-                        contour = contour.squeeze()  # Remove single-dimensional entries
+                    if len(contour) >= 3:
+                        contour = contour.squeeze()
                         yolo_format = [class_index]
                         for point in contour:
-                            # Normalize the coordinates
-                            yolo_format.append(round(point[0] / img_width, 6))  # Rounding to 6 decimal places
+                            yolo_format.append(round(point[0] / img_width, 6))
                             yolo_format.append(round(point[1] / img_height, 6))
                         yolo_format_data.append(yolo_format)
-            # Save Ultralytics YOLO format data to file
             output_path = Path(output_dir) / f"{mask_path.stem}.txt"
             with open(output_path, "w", encoding="utf-8") as file:
                 for item in yolo_format_data:
@@ -457,7 +444,6 @@ def convert_dota_to_yolo_obb(dota_root_path: str):
     """
     dota_root_path = Path(dota_root_path)
 
-    # Class names to indices mapping
     class_mapping = {
         "plane": 0,
         "ship": 1,
@@ -549,25 +535,20 @@ def merge_multi_segment(segments: list[list]):
     segments = [np.array(i).reshape(-1, 2) for i in segments]
     idx_list = [[] for _ in range(len(segments))]
 
-    # Record the indexes with min distance between each segment
     for i in range(1, len(segments)):
         idx1, idx2 = min_index(segments[i - 1], segments[i])
         idx_list[i - 1].append(idx1)
         idx_list[i].append(idx2)
 
-    # Use two round to connect all the segments
     for k in range(2):
-        # Forward connection
         if k == 0:
             for i, idx in enumerate(idx_list):
-                # Middle segments have two indexes, reverse the index of middle segments
                 if len(idx) == 2 and idx[0] > idx[1]:
                     idx = idx[::-1]
                     segments[i] = segments[i][::-1, :]
 
                 segments[i] = np.roll(segments[i], -idx[0], axis=0)
                 segments[i] = np.concatenate([segments[i], segments[i][:1]])
-                # Deal with the first segment and the last one
                 if i in {0, len(idx_list) - 1}:
                     s.append(segments[i])
                 else:
@@ -611,9 +592,8 @@ def yolo_bbox2segment(im_dir: str | Path, save_dir: str | Path | None = None, sa
     from ultralytics.data import YOLODataset
     from ultralytics.utils.ops import xywh2xyxy
 
-    # NOTE: add placeholder to pass class index check
     dataset = YOLODataset(im_dir, data=dict(names=list(range(1000)), channels=3))
-    if len(dataset.labels[0]["segments"]) > 0:  # if it's segment data
+    if len(dataset.labels[0]["segments"]) > 0:
         LOGGER.info("Segmentation labels detected, no need to generate new ones!")
         return
 
@@ -622,7 +602,7 @@ def yolo_bbox2segment(im_dir: str | Path, save_dir: str | Path | None = None, sa
     for label in TQDM(dataset.labels, total=len(dataset.labels), desc="Generating segment labels"):
         h, w = label["shape"]
         boxes = label["bboxes"]
-        if len(boxes) == 0:  # skip empty labels
+        if len(boxes) == 0:
             continue
         boxes[:, [0, 2]] *= w
         boxes[:, [1, 3]] *= h
@@ -676,29 +656,25 @@ def create_synthetic_coco_dataset():
                 color=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
             ).save(image_file)
 
-    # Download labels
     dir = DATASETS_DIR / "coco"
     url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/"
     label_zip = "coco2017labels-segments.zip"
     download([url + label_zip], dir=dir.parent)
 
-    # Create synthetic images
-    shutil.rmtree(dir / "labels" / "test2017", ignore_errors=True)  # Remove test2017 directory as not needed
+    shutil.rmtree(dir / "labels" / "test2017", ignore_errors=True)
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         for subset in {"train2017", "val2017"}:
             subset_dir = dir / "images" / subset
             subset_dir.mkdir(parents=True, exist_ok=True)
 
-            # Read image filenames from label list file
             label_list_file = dir / f"{subset}.txt"
             if label_list_file.exists():
                 with open(label_list_file, encoding="utf-8") as f:
                     image_files = [dir / line.strip() for line in f]
 
-                # Submit all tasks
                 futures = [executor.submit(create_synthetic_image, image_file) for image_file in image_files]
                 for _ in TQDM(as_completed(futures), total=len(futures), desc=f"Generating images for {subset}"):
-                    pass  # The actual work is done in the background
+                    pass
             else:
                 LOGGER.warning(f"Labels file {label_list_file} does not exist. Skipping image creation for {subset}.")
 
@@ -731,7 +707,6 @@ def convert_to_multispectral(path: str | Path, n_channels: int = 10, replace: bo
 
     path = Path(path)
     if path.is_dir():
-        # Process directory
         im_files = sum((list(path.rglob(f"*.{ext}")) for ext in (IMG_FORMATS - {"tif", "tiff"})), [])
         for im_path in im_files:
             try:
@@ -744,12 +719,10 @@ def convert_to_multispectral(path: str | Path, n_channels: int = 10, replace: bo
         if zip:
             zip_directory(path)
     else:
-        # Process a single image
         output_path = path.with_suffix(".tiff")
         img = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
 
-        # Interpolate all pixels at once
-        rgb_wavelengths = np.array([650, 510, 475])  # R, G, B wavelengths (nm)
+        rgb_wavelengths = np.array([650, 510, 475])
         target_wavelengths = np.linspace(450, 700, n_channels)
         f = interp1d(rgb_wavelengths.T, img, kind="linear", bounds_error=False, fill_value="extrapolate")
         multispectral = f(target_wavelengths)
@@ -802,7 +775,6 @@ async def convert_ndjson_to_yolo(ndjson_path: str | Path, output_path: str | Pat
     dataset_dir = output_path / ndjson_path.stem
     splits = {record["split"] for record in image_records}
 
-    # Create directories and prepare YAML structure
     dataset_dir.mkdir(parents=True, exist_ok=True)
     data_yaml = dict(dataset_record)
     data_yaml["names"] = {int(k): v for k, v in dataset_record.get("class_names", {}).items()}
@@ -844,7 +816,6 @@ async def convert_ndjson_to_yolo(ndjson_path: str | Path, output_path: str | Pat
                         return False
             return True
 
-    # Process all images with async downloads
     semaphore = asyncio.Semaphore(64)
     async with aiohttp.ClientSession() as session:
         pbar = TQDM(
@@ -860,7 +831,6 @@ async def convert_ndjson_to_yolo(ndjson_path: str | Path, output_path: str | Pat
         await asyncio.gather(*[tracked_process(record) for record in image_records])
         pbar.close()
 
-    # Write data.yaml
     yaml_path = dataset_dir / "data.yaml"
     YAML.save(yaml_path, data_yaml)
 

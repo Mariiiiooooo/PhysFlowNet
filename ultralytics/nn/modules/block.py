@@ -77,9 +77,8 @@ class DFL(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply the DFL module to input tensor and return transformed output."""
-        b, _, a = x.shape  # batch, channels, anchors
+        b, _, a = x.shape
         return self.conv(x.view(b, 4, self.c1, a).transpose(2, 1).softmax(1)).view(b, 4, a)
-        # return self.conv(x.view(b, self.c1, 4, a).softmax(1)).view(b, 4, a)
 
 
 class Proto(nn.Module):
@@ -96,7 +95,7 @@ class Proto(nn.Module):
         """
         super().__init__()
         self.cv1 = Conv(c1, c_, k=3)
-        self.upsample = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
+        self.upsample = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)
         self.cv2 = Conv(c_, c_, k=3)
         self.cv3 = Conv(c_, c2)
 
@@ -177,8 +176,8 @@ class HGBlock(nn.Module):
         super().__init__()
         block = LightConv if lightconv else Conv
         self.m = nn.ModuleList(block(c1 if i == 0 else cm, cm, k=k, act=act) for i in range(n))
-        self.sc = Conv(c1 + n * cm, c2 // 2, 1, 1, act=act)  # squeeze conv
-        self.ec = Conv(c2 // 2, c2, 1, 1, act=act)  # excitation conv
+        self.sc = Conv(c1 + n * cm, c2 // 2, 1, 1, act=act)
+        self.ec = Conv(c2 // 2, c2, 1, 1, act=act)
         self.add = shortcut and c1 == c2
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -202,7 +201,7 @@ class SPP(nn.Module):
             k (tuple): Kernel sizes for max pooling.
         """
         super().__init__()
-        c_ = c1 // 2  # hidden channels
+        c_ = c1 // 2
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * (len(k) + 1), c2, 1, 1)
         self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
@@ -229,7 +228,7 @@ class SPPF(nn.Module):
             This module is equivalent to SPP(k=(5, 9, 13)).
         """
         super().__init__()
-        c_ = c1 // 2  # hidden channels
+        c_ = c1 // 2
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * 4, c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
@@ -279,10 +278,9 @@ class C2(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        self.c = int(c2 * e)  # hidden channels
+        self.c = int(c2 * e)
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
-        self.cv2 = Conv(2 * self.c, c2, 1)  # optional act=FReLU(c2)
-        # self.attention = ChannelAttention(2 * self.c)  # or SpatialAttention()
+        self.cv2 = Conv(2 * self.c, c2, 1)
         self.m = nn.Sequential(*(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -307,9 +305,9 @@ class C2f(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        self.c = int(c2 * e)  # hidden channels
+        self.c = int(c2 * e)
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
-        self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        self.cv2 = Conv((2 + n) * self.c, c2, 1)
         self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -342,10 +340,10 @@ class C3(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
-        self.cv3 = Conv(2 * c_, c2, 1)  # optional act=FReLU(c2)
+        self.cv3 = Conv(2 * c_, c2, 1)
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=((1, 1), (3, 3)), e=1.0) for _ in range(n)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -387,7 +385,7 @@ class RepC3(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
         self.m = nn.Sequential(*[RepConv(c_, c_) for _ in range(n)])
@@ -434,7 +432,7 @@ class C3Ghost(C3):
             e (float): Expansion ratio.
         """
         super().__init__(c1, c2, n, shortcut, g, e)
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.m = nn.Sequential(*(GhostBottleneck(c_, c_) for _ in range(n)))
 
 
@@ -454,9 +452,9 @@ class GhostBottleneck(nn.Module):
         super().__init__()
         c_ = c2 // 2
         self.conv = nn.Sequential(
-            GhostConv(c1, c_, 1, 1),  # pw
-            DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
-            GhostConv(c_, c2, 1, 1, act=False),  # pw-linear
+            GhostConv(c1, c_, 1, 1),
+            DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),
+            GhostConv(c_, c2, 1, 1, act=False),
         )
         self.shortcut = (
             nn.Sequential(DWConv(c1, c1, k, s, act=False), Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
@@ -485,7 +483,7 @@ class Bottleneck(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = Conv(c1, c_, k[0], 1)
         self.cv2 = Conv(c_, c2, k[1], 1, g=g)
         self.add = shortcut and c1 == c2
@@ -511,12 +509,12 @@ class BottleneckCSP(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
         self.cv3 = nn.Conv2d(c_, c_, 1, 1, bias=False)
         self.cv4 = Conv(2 * c_, c2, 1, 1)
-        self.bn = nn.BatchNorm2d(2 * c_)  # applied to cat(cv2, cv3)
+        self.bn = nn.BatchNorm2d(2 * c_)
         self.act = nn.SiLU()
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)))
 
@@ -668,9 +666,9 @@ class C2fAttn(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        self.c = int(c2 * e)  # hidden channels
+        self.c = int(c2 * e)
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
-        self.cv2 = Conv((3 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        self.cv2 = Conv((3 + n) * self.c, c2, 1)
         self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
         self.attn = MaxSigmoidAttnBlock(self.c, self.c, gc=gc, ec=ec, nh=nh)
 
@@ -760,7 +758,6 @@ class ImagePoolingAttn(nn.Module):
         k = self.key(x)
         v = self.value(x)
 
-        # q = q.reshape(1, text.shape[1], self.nh, self.hc).repeat(bs, 1, 1, 1)
         q = q.reshape(bs, -1, self.nh, self.hc)
         k = k.reshape(bs, -1, self.nh, self.hc)
         v = v.reshape(bs, -1, self.nh, self.hc)
@@ -780,7 +777,6 @@ class ContrastiveHead(nn.Module):
     def __init__(self):
         """Initialize ContrastiveHead with region-text similarity parameters."""
         super().__init__()
-        # NOTE: use -10.0 to keep the init cls loss consistency with other losses
         self.bias = nn.Parameter(torch.tensor([-10.0]))
         self.logit_scale = nn.Parameter(torch.ones([]) * torch.tensor(1 / 0.07).log())
 
@@ -818,9 +814,7 @@ class BNContrastiveHead(nn.Module):
         """
         super().__init__()
         self.norm = nn.BatchNorm2d(embed_dims)
-        # NOTE: use -10.0 to keep the init cls loss consistency with other losses
         self.bias = nn.Parameter(torch.tensor([-10.0]))
-        # use -1.0 is more stable
         self.logit_scale = nn.Parameter(-1.0 * torch.ones([]))
 
     def fuse(self):
@@ -870,7 +864,7 @@ class RepBottleneck(Bottleneck):
             e (float): Expansion ratio.
         """
         super().__init__(c1, c2, shortcut, g, k, e)
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = RepConv(c1, c_, k[0], 1)
 
 
@@ -890,7 +884,7 @@ class RepCSP(C3):
             e (float): Expansion ratio.
         """
         super().__init__(c1, c2, n, shortcut, g, e)
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.m = nn.Sequential(*(RepBottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)))
 
 
@@ -1091,10 +1085,10 @@ class C3f(nn.Module):
             e (float): Expansion ratio.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
-        self.cv3 = Conv((2 + n) * c_, c2, 1)  # optional act=FReLU(c2)
+        self.cv3 = Conv((2 + n) * c_, c2, 1)
         self.m = nn.ModuleList(Bottleneck(c_, c_, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -1145,8 +1139,7 @@ class C3k(C3):
             k (int): Kernel size.
         """
         super().__init__(c1, c2, n, shortcut, g, e)
-        c_ = int(c2 * e)  # hidden channels
-        # self.m = nn.Sequential(*(RepBottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
+        c_ = int(c2 * e)
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
 
 
@@ -1241,7 +1234,7 @@ class CIB(nn.Module):
             lk (bool): Whether to use RepVGGDW.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         self.cv1 = nn.Sequential(
             Conv(c1, c1, 3, g=c1),
             Conv(c1, 2 * c_, 1),
@@ -1651,7 +1644,7 @@ class TorchVision(nn.Module):
             truncate (int): Number of layers to truncate.
             split (bool): Whether to split the output.
         """
-        import torchvision  # scope for faster 'import ultralytics'
+        import torchvision
 
         super().__init__()
         if hasattr(torchvision.models, "get_model"):
@@ -1660,7 +1653,7 @@ class TorchVision(nn.Module):
             self.m = torchvision.models.__dict__[model](pretrained=bool(weights))
         if unwrap:
             layers = list(self.m.children())
-            if isinstance(layers[0], nn.Sequential):  # Second-level for some models like EfficientNet, Swin
+            if isinstance(layers[0], nn.Sequential):
                 layers = [*list(layers[0].children()), *layers[1:]]
             self.m = nn.Sequential(*(layers[:-truncate] if truncate else layers))
             self.split = split
@@ -1893,7 +1886,7 @@ class A2C2f(nn.Module):
             shortcut (bool): Whether to use shortcut connections in C3k blocks.
         """
         super().__init__()
-        c_ = int(c2 * e)  # hidden channels
+        c_ = int(c2 * e)
         assert c_ % 32 == 0, "Dimension of ABlock be a multiple of 32."
 
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -1962,8 +1955,6 @@ class Residual(nn.Module):
         super().__init__()
         self.m = m
         nn.init.zeros_(self.m.w3.bias)
-        # For models with l scale, please change the initialization to
-        # nn.init.constant_(self.m.w3.weight, 1e-6)
         nn.init.zeros_(self.m.w3.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

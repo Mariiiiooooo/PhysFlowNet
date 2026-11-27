@@ -38,18 +38,14 @@ def select_closest_cond_frames(frame_idx: int, cond_frame_outputs: dict[int, Any
         assert max_cond_frame_num >= 2, "we should allow using 2+ conditioning frames"
         selected_outputs = {}
 
-        # The closest conditioning frame before `frame_idx` (if any)
         idx_before = max((t for t in cond_frame_outputs if t < frame_idx), default=None)
         if idx_before is not None:
             selected_outputs[idx_before] = cond_frame_outputs[idx_before]
 
-        # The closest conditioning frame after `frame_idx` (if any)
         idx_after = min((t for t in cond_frame_outputs if t >= frame_idx), default=None)
         if idx_after is not None:
             selected_outputs[idx_after] = cond_frame_outputs[idx_after]
 
-        # Add other temporally closest conditioning frames until reaching a total
-        # of `max_cond_frame_num` conditioning frames.
         num_remain = max_cond_frame_num - len(selected_outputs)
         inds_remain = sorted(
             (t for t in cond_frame_outputs if t not in selected_outputs),
@@ -209,9 +205,7 @@ def apply_rotary_enc(
     freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     if xk_ is None:
-        # No keys to rotate, due to dropout
         return xq_out.type_as(xq).to(xq.device), xk
-    # Repeat freqs along seq_len dim to match k seq_len
     if repeat_freqs_k:
         r = xk_.shape[-2] // xq_.shape[-2]
         freqs_cis = freqs_cis.repeat(*([1] * (freqs_cis.ndim - 2)), r, 1)
@@ -310,9 +304,7 @@ def get_rel_pos(q_size: int, k_size: int, rel_pos: torch.Tensor) -> torch.Tensor
         torch.Size([8, 16, 64])
     """
     max_rel_dist = int(2 * max(q_size, k_size) - 1)
-    # Interpolate rel pos if needed.
     if rel_pos.shape[0] != max_rel_dist:
-        # Interpolate rel pos.
         rel_pos_resized = F.interpolate(
             rel_pos.reshape(1, rel_pos.shape[0], -1).permute(0, 2, 1),
             size=max_rel_dist,
@@ -322,7 +314,6 @@ def get_rel_pos(q_size: int, k_size: int, rel_pos: torch.Tensor) -> torch.Tensor
     else:
         rel_pos_resized = rel_pos
 
-    # Scale the coords with short length if shapes for q and k are different.
     q_coords = torch.arange(q_size)[:, None] * max(k_size / q_size, 1.0)
     k_coords = torch.arange(k_size)[None, :] * max(q_size / k_size, 1.0)
     relative_coords = (q_coords - k_coords) + (k_size - 1) * max(q_size / k_size, 1.0)

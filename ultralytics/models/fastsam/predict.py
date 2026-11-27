@@ -102,7 +102,6 @@ class FastSAMPredictor(SegmentationPredictor):
             masks = result.masks.data
             if masks.shape[1:] != result.orig_shape:
                 masks = scale_masks(masks[None], result.orig_shape)[0]
-            # bboxes prompt
             idx = torch.zeros(len(result), dtype=torch.bool, device=self.device)
             if bboxes is not None:
                 bboxes = torch.as_tensor(bboxes, dtype=torch.int32, device=self.device)
@@ -124,7 +123,7 @@ class FastSAMPredictor(SegmentationPredictor):
                 )
                 point_idx = (
                     torch.ones(len(result), dtype=torch.bool, device=self.device)
-                    if labels.sum() == 0  # all negative points
+                    if labels.sum() == 0
                     else torch.zeros(len(result), dtype=torch.bool, device=self.device)
                 )
                 for point, label in zip(points, labels):
@@ -136,12 +135,12 @@ class FastSAMPredictor(SegmentationPredictor):
                 crop_ims, filter_idx = [], []
                 for i, b in enumerate(result.boxes.xyxy.tolist()):
                     x1, y1, x2, y2 = (int(x) for x in b)
-                    if (masks[i].sum() if TORCH_1_10 else masks[i].sum(0).sum()) <= 100:  # torch 1.9 bug workaround
+                    if (masks[i].sum() if TORCH_1_10 else masks[i].sum(0).sum()) <= 100:
                         filter_idx.append(i)
                         continue
                     crop_ims.append(Image.fromarray(result.orig_img[y1:y2, x1:x2, ::-1]))
                 similarity = self._clip_inference(crop_ims, texts)
-                text_idx = torch.argmax(similarity, dim=-1)  # (M, )
+                text_idx = torch.argmax(similarity, dim=-1)
                 if len(filter_idx):
                     text_idx += (torch.tensor(filter_idx, device=self.device)[None] <= int(text_idx)).sum(0)
                 idx[text_idx] = True
@@ -172,9 +171,9 @@ class FastSAMPredictor(SegmentationPredictor):
         tokenized_text = clip.tokenize(texts).to(self.device)
         image_features = self.clip_model.encode_image(images)
         text_features = self.clip_model.encode_text(tokenized_text)
-        image_features /= image_features.norm(dim=-1, keepdim=True)  # (N, 512)
-        text_features /= text_features.norm(dim=-1, keepdim=True)  # (M, 512)
-        return (image_features * text_features[:, None]).sum(-1)  # (M, N)
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        return (image_features * text_features[:, None]).sum(-1)
 
     def set_prompts(self, prompts):
         """Set prompts to be used during inference."""

@@ -76,7 +76,7 @@ def parse_requirements(file_path=ROOT.parent / "requirements.txt", package=""):
     for line in requires:
         line = line.strip()
         if line and not line.startswith("#"):
-            line = line.partition("#")[0].strip()  # ignore inline comments
+            line = line.partition("#")[0].strip()
             if match := re.match(r"([a-zA-Z0-9-_]+)\s*([<>!=~]+.*)?", line):
                 requirements.append(SimpleNamespace(name=match[1], specifier=match[2].strip() if match[2] else ""))
 
@@ -95,7 +95,7 @@ def parse_version(version="0.0.0") -> tuple:
         (tuple): Tuple of integers representing the numeric part of the version, i.e. (2, 0, 1)
     """
     try:
-        return tuple(map(int, re.findall(r"\d+", version)[:3]))  # '2.0.1+cpu' -> (2, 0, 1)
+        return tuple(map(int, re.findall(r"\d+", version)[:3]))
     except Exception as e:
         LOGGER.warning(f"failure for parse_version({version}), returning (0, 0, 0): {e}")
         return 0, 0, 0
@@ -129,15 +129,13 @@ def check_imgsz(imgsz, stride=32, min_dim=1, max_dim=2, floor=0):
     Returns:
         (list[int] | int): Updated image size.
     """
-    # Convert stride to integer if it is a tensor
     stride = int(stride.max() if isinstance(stride, torch.Tensor) else stride)
 
-    # Convert image size to list if it is an integer
     if isinstance(imgsz, int):
         imgsz = [imgsz]
     elif isinstance(imgsz, (list, tuple)):
         imgsz = list(imgsz)
-    elif isinstance(imgsz, str):  # i.e. '640' or '[640,640]'
+    elif isinstance(imgsz, str):
         imgsz = [int(imgsz)] if imgsz.isnumeric() else eval(imgsz)
     else:
         raise TypeError(
@@ -145,7 +143,6 @@ def check_imgsz(imgsz, stride=32, min_dim=1, max_dim=2, floor=0):
             f"Valid imgsz types are int i.e. 'imgsz=640' or list i.e. 'imgsz=[640,640]'"
         )
 
-    # Apply max_dim
     if len(imgsz) > max_dim:
         msg = (
             "'train' and 'val' imgsz must be an integer, while 'predict' and 'export' imgsz may be a [h, w] list "
@@ -155,14 +152,11 @@ def check_imgsz(imgsz, stride=32, min_dim=1, max_dim=2, floor=0):
             raise ValueError(f"imgsz={imgsz} is not a valid image size. {msg}")
         LOGGER.warning(f"updating to 'imgsz={max(imgsz)}'. {msg}")
         imgsz = [max(imgsz)]
-    # Make image size a multiple of the stride
     sz = [max(math.ceil(x / stride) * stride, floor) for x in imgsz]
 
-    # Print warning message if image size was updated
     if sz != imgsz:
         LOGGER.warning(f"imgsz={imgsz} must be multiple of max stride {stride}, updating to {sz}")
 
-    # Add missing dimensions if necessary
     sz = [sz[0], sz[0]] if min_dim == 2 and len(sz) == 1 else sz[0] if min_dim == 1 and len(sz) == 1 else sz
 
     return sz
@@ -213,23 +207,23 @@ def check_version(
         Check if current version is between 20.04 (inclusive) and 22.04 (exclusive)
         >>> check_version(current="21.10", required=">20.04,<22.04")
     """
-    if not current:  # if current is '' or None
+    if not current:
         LOGGER.warning(f"invalid check_version({current}, {required}) requested, please check values.")
         return True
-    elif not current[0].isdigit():  # current is package name rather than version string, i.e. current='ultralytics'
+    elif not current[0].isdigit():
         try:
-            name = current  # assigned package name to 'name' arg
-            current = metadata.version(current)  # get version string from package name
+            name = current
+            current = metadata.version(current)
         except metadata.PackageNotFoundError as e:
             if hard:
                 raise ModuleNotFoundError(f"{current} package is required but not installed") from e
             else:
                 return False
 
-    if not required:  # if required is '' or None
+    if not required:
         return True
 
-    if "sys_platform" in required and (  # i.e. required='<2.4.0,>=1.8.0; sys_platform == "win32"'
+    if "sys_platform" in required and (
         (WINDOWS and "win32" not in required)
         or (LINUX and "linux" not in required)
         or (MACOS and "macos" not in required and "darwin" not in required)
@@ -239,12 +233,12 @@ def check_version(
     op = ""
     version = ""
     result = True
-    c = parse_version(current)  # '1.2.3' -> (1, 2, 3)
+    c = parse_version(current)
     for r in required.strip(",").split(","):
-        op, version = re.match(r"([^0-9]*)([\d.]+)", r).groups()  # split '>=22.04' -> ('>=', '22.04')
+        op, version = re.match(r"([^0-9]*)([\d.]+)", r).groups()
         if not op:
-            op = ">="  # assume >= if no op passed
-        v = parse_version(version)  # '1.2.3' -> (1, 2, 3)
+            op = ">="
+        v = parse_version(version)
         if op == "==" and c != v:
             result = False
         elif op == "!=" and c == v:
@@ -260,7 +254,7 @@ def check_version(
     if not result:
         warning = f"{name}{required} is required, but {name}=={current} is currently installed {msg}"
         if hard:
-            raise ModuleNotFoundError(warning)  # assert version requirements met
+            raise ModuleNotFoundError(warning)
         if verbose:
             LOGGER.warning(warning)
     return result
@@ -276,10 +270,10 @@ def check_latest_pypi_version(package_name="ultralytics"):
     Returns:
         (str): The latest version of the package.
     """
-    import requests  # scoped as slow import
+    import requests
 
     try:
-        requests.packages.urllib3.disable_warnings()  # Disable the InsecureRequestWarning
+        requests.packages.urllib3.disable_warnings()
         response = requests.get(f"https://pypi.org/pypi/{package_name}/json", timeout=3)
         if response.status_code == 200:
             return response.json()["info"]["version"]
@@ -299,7 +293,7 @@ def check_pip_update_available():
             from ultralytics import __version__
 
             latest = check_latest_pypi_version()
-            if check_version(__version__, f"<{latest}"):  # check if current version is < latest version
+            if check_version(__version__, f"<{latest}"):
                 LOGGER.info(
                     f"New https://pypi.org/project/ultralytics/{latest} available 😃 "
                     f"Update with 'pip install -U ultralytics'"
@@ -322,20 +316,17 @@ def check_font(font="Arial.ttf"):
     Returns:
         (Path): Resolved font file path.
     """
-    from matplotlib import font_manager  # scope for faster 'import ultralytics'
+    from matplotlib import font_manager
 
-    # Check USER_CONFIG_DIR
     name = Path(font).name
     file = USER_CONFIG_DIR / name
     if file.exists():
         return file
 
-    # Check system fonts
     matches = [s for s in font_manager.findSystemFonts() if font in s]
     if any(matches):
         return matches[0]
 
-    # Download to USER_CONFIG_DIR if missing
     url = f"https://github.com/ultralytics/assets/releases/download/v0.0.0/{name}"
     if downloads.is_url(url, check=True):
         downloads.safe_download(url=url, file=file)
@@ -386,7 +377,7 @@ def check_requirements(requirements=ROOT.parent / "requirements.txt", exclude=()
         >>> check_requirements([("onnxruntime", "onnxruntime-gpu"), "numpy"])
     """
     prefix = colorstr("red", "bold", "requirements:")
-    if isinstance(requirements, Path):  # requirements.txt file
+    if isinstance(requirements, Path):
         file = requirements.resolve()
         assert file.exists(), f"{prefix} {file} not found, check failed."
         requirements = [f"{x.name}{x.specifier}" for x in parse_requirements(file) if x.name not in exclude]
@@ -399,7 +390,7 @@ def check_requirements(requirements=ROOT.parent / "requirements.txt", exclude=()
         satisfied = False
 
         for candidate in candidates:
-            r_stripped = candidate.rpartition("/")[-1].replace(".git", "")  # replace git+https://org/repo.git -> 'repo'
+            r_stripped = candidate.rpartition("/")[-1].replace(".git", "")
             match = re.match(r"([a-zA-Z0-9-_]+)([<>!=~]+.*)?", r_stripped)
             name, required = match[1], match[2].strip() if match[2] else ""
             try:
@@ -433,11 +424,10 @@ def check_requirements(requirements=ROOT.parent / "requirements.txt", exclude=()
                 raise
         return subprocess.check_output(f"pip install --no-cache-dir {packages} {commands}", shell=True, text=True)
 
-    s = " ".join(f'"{x}"' for x in pkgs)  # console string
+    s = " ".join(f'"{x}"' for x in pkgs)
     if s:
-        if install and AUTOINSTALL:  # check environment variable
-            # Note uv fails on arm64 macOS and Raspberry Pi runners
-            n = len(pkgs)  # number of packages updates
+        if install and AUTOINSTALL:
+            n = len(pkgs)
             LOGGER.info(f"{prefix} Ultralytics requirement{'s' * (n > 1)} {pkgs} not found, attempting AutoUpdate...")
             try:
                 t = time.time()
@@ -479,7 +469,6 @@ def check_torchvision():
         "1.12": ["0.13"],
     }
 
-    # Check major and minor versions
     v_torch = ".".join(TORCH_VERSION.split("+", 1)[0].split(".")[:2])
     if v_torch in compatibility_table:
         compatible_versions = compatibility_table[v_torch]
@@ -506,7 +495,7 @@ def check_suffix(file="yolo11n.pt", suffix=".pt", msg=""):
         if isinstance(suffix, str):
             suffix = {suffix}
         for f in file if isinstance(file, (list, tuple)) else [file]:
-            if s := str(f).rpartition(".")[-1].lower().strip():  # file suffix
+            if s := str(f).rpartition(".")[-1].lower().strip():
                 assert f".{s}" in suffix, f"{msg}{f} acceptable suffix is {suffix}, not .{s}"
 
 
@@ -523,12 +512,12 @@ def check_yolov5u_filename(file: str, verbose: bool = True):
     """
     if "yolov3" in file or "yolov5" in file:
         if "u.yaml" in file:
-            file = file.replace("u.yaml", ".yaml")  # i.e. yolov5nu.yaml -> yolov5n.yaml
+            file = file.replace("u.yaml", ".yaml")
         elif ".pt" in file and "u" not in file:
             original_file = file
-            file = re.sub(r"(.*yolov5([nsmlx]))\.pt", "\\1u.pt", file)  # i.e. yolov5n.pt -> yolov5nu.pt
-            file = re.sub(r"(.*yolov5([nsmlx])6)\.pt", "\\1u.pt", file)  # i.e. yolov5n6.pt -> yolov5n6u.pt
-            file = re.sub(r"(.*yolov3(|-tiny|-spp))\.pt", "\\1u.pt", file)  # i.e. yolov3-spp.pt -> yolov3-sppu.pt
+            file = re.sub(r"(.*yolov5([nsmlx]))\.pt", "\\1u.pt", file)
+            file = re.sub(r"(.*yolov5([nsmlx])6)\.pt", "\\1u.pt", file)
+            file = re.sub(r"(.*yolov3(|-tiny|-spp))\.pt", "\\1u.pt", file)
             if file != original_file and verbose:
                 LOGGER.info(
                     f"PRO TIP 💡 Replace 'model={original_file}' with new 'model={file}'.\nYOLOv5 'u' models are "
@@ -550,7 +539,7 @@ def check_model_file_from_stem(model="yolo11n"):
     """
     path = Path(model)
     if not path.suffix and path.stem in downloads.GITHUB_ASSETS_STEMS:
-        return path.with_suffix(".pt")  # add suffix, i.e. yolo11n -> yolo11n.pt
+        return path.with_suffix(".pt")
     return model
 
 
@@ -568,30 +557,30 @@ def check_file(file, suffix="", download=True, download_dir=".", hard=True):
     Returns:
         (str): Path to the file.
     """
-    check_suffix(file, suffix)  # optional
-    file = str(file).strip()  # convert to string and strip spaces
-    file = check_yolov5u_filename(file)  # yolov5n -> yolov5nu
+    check_suffix(file, suffix)
+    file = str(file).strip()
+    file = check_yolov5u_filename(file)
     if (
         not file
-        or ("://" not in file and Path(file).exists())  # '://' check required in Windows Python<3.10
+        or ("://" not in file and Path(file).exists())
         or file.lower().startswith("grpc://")
-    ):  # file exists or gRPC Triton images
+    ):
         return file
-    elif download and file.lower().startswith(("https://", "http://", "rtsp://", "rtmp://", "tcp://")):  # download
-        url = file  # warning: Pathlib turns :// -> :/
-        file = Path(download_dir) / url2file(file)  # '%2F' to '/', split https://url.com/file.txt?auth
+    elif download and file.lower().startswith(("https://", "http://", "rtsp://", "rtmp://", "tcp://")):
+        url = file
+        file = Path(download_dir) / url2file(file)
         if file.exists():
-            LOGGER.info(f"Found {clean_url(url)} locally at {file}")  # file already exists
+            LOGGER.info(f"Found {clean_url(url)} locally at {file}")
         else:
             downloads.safe_download(url=url, file=file, unzip=False)
         return str(file)
-    else:  # search
-        files = glob.glob(str(ROOT / "**" / file), recursive=True) or glob.glob(str(ROOT.parent / file))  # find file
+    else:
+        files = glob.glob(str(ROOT / "**" / file), recursive=True) or glob.glob(str(ROOT.parent / file))
         if not files and hard:
             raise FileNotFoundError(f"'{file}' does not exist")
         elif len(files) > 1 and hard:
             raise FileNotFoundError(f"Multiple files match '{file}', specify exact path: {files}")
-        return files[0] if len(files) else []  # return file
+        return files[0] if len(files) else []
 
 
 def check_yaml(file, suffix=(".yaml", ".yml"), hard=True):
@@ -641,7 +630,7 @@ def check_imshow(warn=False):
         if LINUX:
             assert not IS_COLAB and not IS_KAGGLE
             assert "DISPLAY" in os.environ, "The DISPLAY environment variable isn't set."
-        cv2.imshow("test", np.zeros((8, 8, 3), dtype=np.uint8))  # show a small 8-pixel image
+        cv2.imshow("test", np.zeros((8, 8, 3), dtype=np.uint8))
         cv2.waitKey(1)
         cv2.destroyAllWindows()
         cv2.waitKey(1)
@@ -660,30 +649,29 @@ def check_yolo(verbose=True, device=""):
         verbose (bool): Whether to print verbose information.
         device (str | torch.device): Device to use for YOLO.
     """
-    import psutil  # scoped as slow import
+    import psutil
 
     from ultralytics.utils.torch_utils import select_device
 
     if IS_COLAB:
-        shutil.rmtree("sample_data", ignore_errors=True)  # remove colab /sample_data directory
+        shutil.rmtree("sample_data", ignore_errors=True)
 
     if verbose:
-        # System info
-        gib = 1 << 30  # bytes per GiB
+        gib = 1 << 30
         ram = psutil.virtual_memory().total
         total, used, free = shutil.disk_usage("/")
         s = f"({os.cpu_count()} CPUs, {ram / gib:.1f} GB RAM, {(total - free) / gib:.1f}/{total / gib:.1f} GB disk)"
         try:
             from IPython import display
 
-            display.clear_output()  # clear display if notebook
+            display.clear_output()
         except ImportError:
             pass
     else:
         s = ""
 
     if GIT.is_repo:
-        check_multiple_install()  # check conflicting installation if using local clone
+        check_multiple_install()
 
     select_device(device=device, newline=False)
     LOGGER.info(f"Setup complete ✅ {s}")
@@ -696,12 +684,12 @@ def collect_system_info():
     Returns:
         (dict): Dictionary containing system information.
     """
-    import psutil  # scoped as slow import
+    import psutil
 
-    from ultralytics.utils import ENVIRONMENT  # scope to avoid circular import
+    from ultralytics.utils import ENVIRONMENT
     from ultralytics.utils.torch_utils import get_cpu_info, get_gpu_info
 
-    gib = 1 << 30  # bytes per GiB
+    gib = 1 << 30
     cuda = torch.cuda.is_available()
     check_yolo()
     total, used, free = shutil.disk_usage("/")
@@ -771,12 +759,11 @@ def check_amp(model):
     """
     from ultralytics.utils.torch_utils import autocast
 
-    device = next(model.parameters()).device  # get model device
+    device = next(model.parameters()).device
     prefix = colorstr("AMP: ")
     if device.type in {"cpu", "mps"}:
-        return False  # AMP only used on CUDA devices
+        return False
     else:
-        # GPUs that have issues with AMP
         pattern = re.compile(
             r"(nvidia|geforce|quadro|tesla).*?(1660|1650|1630|t400|t550|t600|t1000|t1200|t2000|k40m)", re.IGNORECASE
         )
@@ -792,14 +779,14 @@ def check_amp(model):
     def amp_allclose(m, im):
         """All close FP32 vs AMP results."""
         batch = [im] * 8
-        imgsz = max(256, int(model.stride.max() * 4))  # max stride P5-32 and P6-64
-        a = m(batch, imgsz=imgsz, device=device, verbose=False)[0].boxes.data  # FP32 inference
+        imgsz = max(256, int(model.stride.max() * 4))
+        a = m(batch, imgsz=imgsz, device=device, verbose=False)[0].boxes.data
         with autocast(enabled=True):
-            b = m(batch, imgsz=imgsz, device=device, verbose=False)[0].boxes.data  # AMP inference
+            b = m(batch, imgsz=imgsz, device=device, verbose=False)[0].boxes.data
         del m
-        return a.shape == b.shape and torch.allclose(a, b.float(), atol=0.5)  # close to 0.5 absolute tolerance
+        return a.shape == b.shape and torch.allclose(a, b.float(), atol=0.5)
 
-    im = ASSETS / "bus.jpg"  # image to check
+    im = ASSETS / "bus.jpg"
     LOGGER.info(f"{prefix}running Automatic Mixed Precision (AMP) checks...")
     warning_msg = "Setting 'amp=True'. If you experience zero-mAP or NaN losses you can disable AMP with amp=False."
     try:
@@ -834,7 +821,7 @@ def check_multiple_install():
             "issues. See https://docs.ultralytics.com/quickstart/"
         )
         if result.returncode != 0:
-            if "not found" in result.stderr.lower():  # Package not pip-installed but locally imported
+            if "not found" in result.stderr.lower():
                 LOGGER.warning(f"Ultralytics not found via pip but importing from: {ROOT}. {install_msg}")
             return
         yolo_path = (Path(re.findall(r"location:\s+(.+)", result.stdout, flags=re.I)[-1]) / "ultralytics").resolve()
@@ -861,9 +848,9 @@ def print_args(args: dict | None = None, show_file=True, show_func=False):
         """Clean longer Ultralytics HUB URLs by stripping potential authentication information."""
         return clean_url(v) if (isinstance(v, str) and v.startswith("http") and len(v) > 100) else v
 
-    x = inspect.currentframe().f_back  # previous frame
+    x = inspect.currentframe().f_back
     file, _, func, _, _ = inspect.getframeinfo(x)
-    if args is None:  # get args automatically
+    if args is None:
         args, _, _, frm = inspect.getargvalues(x)
         args = {k: v for k, v in frm.items() if k in args}
     try:
@@ -882,21 +869,17 @@ def cuda_device_count() -> int:
         (int): The number of NVIDIA GPUs available.
     """
     if IS_JETSON:
-        # NVIDIA Jetson does not fully support nvidia-smi and therefore use PyTorch instead
         return torch.cuda.device_count()
     else:
         try:
-            # Run the nvidia-smi command and capture its output
             output = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=count", "--format=csv,noheader,nounits"], encoding="utf-8"
             )
 
-            # Take the first line and strip any leading/trailing white space
             first_line = output.strip().split("\n", 1)[0]
 
             return int(first_line)
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
-            # If the command fails, nvidia-smi is not found, or output is not an integer, assume no GPUs are available
             return 0
 
 
@@ -939,15 +922,13 @@ def is_intel():
     """
     from ultralytics.utils.torch_utils import get_cpu_info
 
-    # Check CPU
     if "intel" in get_cpu_info().lower():
         return True
 
-    # Check GPU via xpu-smi
     try:
         result = subprocess.run(["xpu-smi", "discovery"], capture_output=True, text=True, timeout=5)
         return "intel" in result.stdout.lower()
-    except Exception:  # broad clause to capture all Intel GPU exception types
+    except Exception:
         return False
 
 
@@ -964,11 +945,9 @@ def is_sudo_available() -> bool:
     return subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
-# Run checks and define constants
-check_python("3.8", hard=False, verbose=True)  # check python version
-check_torchvision()  # check torch-torchvision compatibility
+check_python("3.8", hard=False, verbose=True)
+check_torchvision()
 
-# Define constants
 IS_PYTHON_3_8 = PYTHON_VERSION.startswith("3.8")
 IS_PYTHON_3_12 = PYTHON_VERSION.startswith("3.12")
 IS_PYTHON_3_13 = PYTHON_VERSION.startswith("3.13")

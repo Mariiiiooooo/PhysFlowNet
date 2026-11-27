@@ -9,4 +9,4 @@ __all__ = (
     "SAM2Predictor",
     "SAM2VideoPredictor",
     "SAM2DynamicInteractivePredictor",
-)  # tuple or list of exportable items
+)

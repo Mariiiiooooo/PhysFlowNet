@@ -22,7 +22,7 @@ def on_fit_epoch_end(trainer):
     """Handle end of training epoch event and collect system metrics."""
     if RANK in {-1, 0} and hasattr(trainer, "system_logger"):
         system_metrics = trainer.system_logger.get_metrics()
-        print(system_metrics)  # for debug
+        print(system_metrics)
 
 
 def on_model_save(trainer):
@@ -68,6 +68,6 @@ callbacks = (
         "on_predict_start": on_predict_start,
         "on_export_start": on_export_start,
     }
-    if SETTINGS.get("platform", False) is True  # disabled for debugging
+    if SETTINGS.get("platform", False) is True
     else {}
 )

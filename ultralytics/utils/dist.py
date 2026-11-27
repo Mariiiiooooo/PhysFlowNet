@@ -23,7 +23,7 @@ def find_free_network_port() -> int:
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]  # port
+        return s.getsockname()[1]
 
 
 def generate_ddp_file(trainer):
@@ -90,7 +90,7 @@ def generate_ddp_command(trainer):
     import __main__  # noqa local import to avoid https://github.com/Lightning-AI/pytorch-lightning/issues/15218
 
     if not trainer.resume:
-        shutil.rmtree(trainer.save_dir)  # remove the save_dir
+        shutil.rmtree(trainer.save_dir)
     file = generate_ddp_file(trainer)
     dist_cmd = "torch.distributed.run" if TORCH_1_9 else "torch.distributed.launch"
     port = find_free_network_port()
@@ -123,5 +123,5 @@ def ddp_cleanup(trainer, file):
         >>> file = "/tmp/ddp_temp_123456789.py"
         >>> ddp_cleanup(trainer, file)
     """
-    if f"{id(trainer)}.py" in file:  # if temp_file suffix in file
+    if f"{id(trainer)}.py" in file:
         os.remove(file)

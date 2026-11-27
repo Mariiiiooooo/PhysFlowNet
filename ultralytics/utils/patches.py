@@ -13,8 +13,7 @@ import cv2
 import numpy as np
 import torch
 
-# OpenCV Multilanguage-friendly functions ------------------------------------------------------------------------------
-_imshow = cv2.imshow  # copy to avoid recursion errors
+_imshow = cv2.imshow
 
 
 def imread(filename: str, flags: int = cv2.IMREAD_COLOR) -> np.ndarray | None:
@@ -36,12 +35,11 @@ def imread(filename: str, flags: int = cv2.IMREAD_COLOR) -> np.ndarray | None:
     if filename.endswith((".tiff", ".tif")):
         success, frames = cv2.imdecodemulti(file_bytes, cv2.IMREAD_UNCHANGED)
         if success:
-            # Handle RGB images in tif/tiff format
             return frames[0] if len(frames) == 1 and frames[0].ndim == 3 else np.stack(frames, axis=2)
         return None
     else:
         im = cv2.imdecode(file_bytes, flags)
-        return im[..., None] if im is not None and im.ndim == 2 else im  # Always ensure 3 dimensions
+        return im[..., None] if im is not None and im.ndim == 2 else im
 
 
 def imwrite(filename: str, img: np.ndarray, params: list[int] | None = None) -> bool:
@@ -91,7 +89,6 @@ def imshow(winname: str, mat: np.ndarray) -> None:
     _imshow(winname.encode("unicode_escape").decode(), mat)
 
 
-# PyTorch functions ----------------------------------------------------------------------------------------------------
 _torch_save = torch.save
 
 
@@ -135,13 +132,13 @@ def torch_save(*args, **kwargs):
         >>> model = torch.nn.Linear(10, 1)
         >>> torch_save(model.state_dict(), "model.pt")
     """
-    for i in range(4):  # 3 retries
+    for i in range(4):
         try:
             return _torch_save(*args, **kwargs)
-        except RuntimeError as e:  # Unable to save, possibly waiting for device to flush or antivirus scan
+        except RuntimeError as e:
             if i == 3:
                 raise e
-            time.sleep((2**i) / 2)  # Exponential backoff: 0.5s, 1.0s, 2.0s
+            time.sleep((2**i) / 2)
 
 
 @contextmanager
@@ -156,11 +153,11 @@ def arange_patch(args):
 
         def arange(*args, dtype=None, **kwargs):
             """Return a 1-D tensor of size with values from the interval and common difference."""
-            return func(*args, **kwargs).to(dtype)  # cast to dtype instead of passing dtype
+            return func(*args, **kwargs).to(dtype)
 
-        torch.arange = arange  # patch
+        torch.arange = arange
         yield
-        torch.arange = func  # unpatch
+        torch.arange = func
     else:
         yield
 

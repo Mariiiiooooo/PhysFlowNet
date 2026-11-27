@@ -90,9 +90,9 @@ class ClassificationTrainer(BaseTrainer):
             if not self.args.pretrained and hasattr(m, "reset_parameters"):
                 m.reset_parameters()
             if isinstance(m, torch.nn.Dropout) and self.args.dropout:
-                m.p = self.args.dropout  # set dropout
+                m.p = self.args.dropout
         for p in model.parameters():
-            p.requires_grad = True  # for training
+            p.requires_grad = True
         return model
 
     def setup_model(self):
@@ -102,7 +102,7 @@ class ClassificationTrainer(BaseTrainer):
         Returns:
             (Any): Model checkpoint if applicable, otherwise None.
         """
-        import torchvision  # scope for faster 'import ultralytics'
+        import torchvision
 
         if str(self.model) in torchvision.models.__dict__:
             self.model = torchvision.models.__dict__[self.model](
@@ -141,11 +141,10 @@ class ClassificationTrainer(BaseTrainer):
         Returns:
             (torch.utils.data.DataLoader): DataLoader for the specified dataset and mode.
         """
-        with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
+        with torch_distributed_zero_first(rank):
             dataset = self.build_dataset(dataset_path, mode)
 
         loader = build_dataloader(dataset, batch_size, self.args.workers, rank=rank, drop_last=self.args.compile)
-        # Attach inference transforms
         if mode != "train":
             if is_parallel(self.model):
                 self.model.module.transforms = loader.dataset.torch_transforms
@@ -198,7 +197,7 @@ class ClassificationTrainer(BaseTrainer):
         """Evaluate trained model and save validation results."""
         for f in self.last, self.best:
             if f.exists():
-                strip_optimizer(f)  # strip optimizers
+                strip_optimizer(f)
                 if f is self.best:
                     LOGGER.info(f"\nValidating {f}...")
                     self.validator.args.data = self.args.data
@@ -215,7 +214,7 @@ class ClassificationTrainer(BaseTrainer):
             batch (dict[str, torch.Tensor]): Batch containing images and class labels.
             ni (int): Number of iterations.
         """
-        batch["batch_idx"] = torch.arange(batch["img"].shape[0])  # add batch index for plotting
+        batch["batch_idx"] = torch.arange(batch["img"].shape[0])
         plot_images(
             labels=batch,
             fname=self.save_dir / f"train_batch{ni}.jpg",

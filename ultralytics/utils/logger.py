@@ -12,7 +12,6 @@ from pathlib import Path
 from ultralytics.utils import MACOS, RANK
 from ultralytics.utils.checks import check_requirements
 
-# Initialize default log file
 DEFAULT_LOG_PATH = Path("train.log")
 if RANK in {-1, 0} and DEFAULT_LOG_PATH.exists():
     DEFAULT_LOG_PATH.unlink(missing_ok=True)
@@ -64,18 +63,16 @@ class ConsoleLogger:
         if not self.is_api:
             self.destination = Path(destination)
 
-        # Console capture
         self.original_stdout = sys.stdout
         self.original_stderr = sys.stderr
         self.log_queue = queue.Queue(maxsize=1000)
         self.active = False
         self.worker_thread = None
 
-        # State tracking
         self.last_line = ""
         self.last_time = 0.0
-        self.last_progress_line = ""  # Track last progress line for deduplication
-        self.last_was_progress = False  # Track if last line was a progress bar
+        self.last_progress_line = ""
+        self.last_was_progress = False
 
     def start_capture(self):
         """Start capturing console output and redirect stdout/stderr to custom capture objects."""
@@ -86,7 +83,6 @@ class ConsoleLogger:
         sys.stdout = self._ConsoleCapture(self.original_stdout, self._queue_log)
         sys.stderr = self._ConsoleCapture(self.original_stderr, self._queue_log)
 
-        # Hook Ultralytics logger
         try:
             handler = self._LogHandler(self._queue_log)
             logging.getLogger("ultralytics").addHandler(handler)
@@ -113,7 +109,6 @@ class ConsoleLogger:
 
         current_time = time.time()
 
-        # Handle carriage returns and process lines
         if "\r" in text:
             text = text.split("\r")[-1]
 
@@ -124,11 +119,9 @@ class ConsoleLogger:
         for line in lines:
             line = line.rstrip()
 
-            # Skip lines with only thin progress bars (partial progress)
-            if "─" in line:  # Has thin lines but no thick lines
+            if "─" in line:
                 continue
 
-            # Deduplicate completed progress bars only if they match the previous progress line
             if " ━━" in line:
                 progress_core = line.split(" ━━")[0].strip()
                 if progress_core == self.last_progress_line and self.last_was_progress:
@@ -136,27 +129,23 @@ class ConsoleLogger:
                 self.last_progress_line = progress_core
                 self.last_was_progress = True
             else:
-                # Skip empty line after progress bar
                 if not line and self.last_was_progress:
                     self.last_was_progress = False
                     continue
                 self.last_was_progress = False
 
-            # General deduplication
             if line == self.last_line and current_time - self.last_time < 0.1:
                 continue
 
             self.last_line = line
             self.last_time = current_time
 
-            # Add timestamp if needed
             if not line.startswith("[20"):
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 line = f"[{timestamp}] {line}"
 
-            # Queue with overflow protection
             if not self._safe_put(f"{line}\n"):
-                continue  # Skip if queue handling fails
+                continue
 
     def _safe_put(self, item):
         """Safely put item in queue with overflow handling."""
@@ -165,7 +154,7 @@ class ConsoleLogger:
             return True
         except queue.Full:
             try:
-                self.log_queue.get_nowait()  # Drop oldest
+                self.log_queue.get_nowait()
                 self.log_queue.put_nowait(item)
                 return True
             except queue.Empty:
@@ -186,7 +175,7 @@ class ConsoleLogger:
         """Write log to API endpoint or local file destination."""
         try:
             if self.is_api:
-                import requests  # scoped as slow import
+                import requests
 
                 payload = {"timestamp": datetime.now().isoformat(), "message": text.strip()}
                 requests.post(str(self.destination), json=payload, timeout=5)
@@ -258,7 +247,7 @@ class SystemLogger:
 
     def __init__(self):
         """Initialize the system logger."""
-        import psutil  # scoped as slow import
+        import psutil
 
         self.pynvml = None
         self.nvidia_initialized = self._init_nvidia()
@@ -314,7 +303,7 @@ class SystemLogger:
         Returns:
             metrics (dict): System metrics containing 'cpu', 'ram', 'disk', 'network', 'gpus' with respective usage data.
         """
-        import psutil  # scoped as slow import
+        import psutil
 
         net = psutil.net_io_counters()
         disk = psutil.disk_io_counters()
@@ -336,7 +325,6 @@ class SystemLogger:
             "gpus": {},
         }
 
-        # Add GPU metrics (NVIDIA only)
         if self.nvidia_initialized:
             metrics["gpus"].update(self._get_nvidia_metrics())
 
@@ -377,10 +365,8 @@ if __name__ == "__main__":
         while True:
             metrics = logger.get_metrics()
 
-            # Clear screen (works on most terminals)
             print("\033[H\033[J", end="")
 
-            # Display system metrics
             print(f"CPU: {metrics['cpu']:5.1f}%")
             print(f"RAM: {metrics['ram']:5.1f}%")
             print(f"Disk Read: {metrics['disk']['read_mb']:8.1f} MB")
@@ -389,7 +375,6 @@ if __name__ == "__main__":
             print(f"Net Recv: {metrics['network']['recv_mb']:9.1f} MB")
             print(f"Net Sent: {metrics['network']['sent_mb']:9.1f} MB")
 
-            # Display GPU metrics if available
             if metrics["gpus"]:
                 print("\nGPU Metrics:")
                 for gpu_id, gpu_data in metrics["gpus"].items():

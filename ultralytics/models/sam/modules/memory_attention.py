@@ -85,7 +85,6 @@ class MemoryAttentionLayer(nn.Module):
             kv_in_dim=64,
         )
 
-        # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model)
@@ -99,7 +98,6 @@ class MemoryAttentionLayer(nn.Module):
 
         self.activation = nn.ReLU()
 
-        # Where to add pos enc
         self.pos_enc_at_attn = pos_enc_at_attn
         self.pos_enc_at_cross_attn_queries = pos_enc_at_cross_attn_queries
         self.pos_enc_at_cross_attn_keys = pos_enc_at_cross_attn_keys
@@ -126,7 +124,6 @@ class MemoryAttentionLayer(nn.Module):
             assert isinstance(self.cross_attn_image, RoPEAttention)
             kwds = {"num_k_exclude_rope": num_k_exclude_rope}
 
-        # Cross-Attention
         tgt2 = self.norm2(tgt)
         tgt2 = self.cross_attn_image(
             q=tgt2 + query_pos if self.pos_enc_at_cross_attn_queries else tgt2,
@@ -160,7 +157,6 @@ class MemoryAttentionLayer(nn.Module):
         """
         tgt = self._forward_sa(tgt, query_pos)
         tgt = self._forward_ca(tgt, memory, query_pos, pos, num_k_exclude_rope)
-        # MLP
         tgt2 = self.norm3(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
         tgt = tgt + self.dropout3(tgt2)
@@ -204,7 +200,7 @@ class MemoryAttention(nn.Module):
         pos_enc_at_input: bool,
         layer: nn.Module,
         num_layers: int,
-        batch_first: bool = True,  # Do layers expect batch first input?
+        batch_first: bool = True,
     ):
         """
         Initialize MemoryAttention with specified layers and normalization for sequential data processing.
@@ -241,11 +237,11 @@ class MemoryAttention(nn.Module):
 
     def forward(
         self,
-        curr: torch.Tensor,  # self-attention inputs
-        memory: torch.Tensor,  # cross-attention inputs
-        curr_pos: torch.Tensor | None = None,  # pos_enc for self-attention inputs
-        memory_pos: torch.Tensor | None = None,  # pos_enc for cross-attention inputs
-        num_obj_ptr_tokens: int = 0,  # number of object pointer *tokens*
+        curr: torch.Tensor,
+        memory: torch.Tensor,
+        curr_pos: torch.Tensor | None = None,
+        memory_pos: torch.Tensor | None = None,
+        num_obj_ptr_tokens: int = 0,
     ) -> torch.Tensor:
         """
         Process inputs through attention layers, applying self and cross-attention with positional encoding.
@@ -284,7 +280,6 @@ class MemoryAttention(nn.Module):
             output = output + 0.1 * curr_pos
 
         if self.batch_first:
-            # Convert to batch first
             output = output.transpose(0, 1)
             curr_pos = curr_pos.transpose(0, 1)
             memory = memory.transpose(0, 1)
@@ -305,7 +300,6 @@ class MemoryAttention(nn.Module):
         normed_output = self.norm(output)
 
         if self.batch_first:
-            # Convert back to seq first
             normed_output = normed_output.transpose(0, 1)
             curr_pos = curr_pos.transpose(0, 1)
 

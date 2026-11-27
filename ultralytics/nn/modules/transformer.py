@@ -77,7 +77,6 @@ class TransformerEncoderLayer(nn.Module):
                 "TransformerEncoderLayer() requires torch>=1.9 to use nn.MultiheadAttention(batch_first=True)."
             )
         self.ma = nn.MultiheadAttention(c1, num_heads, dropout=dropout, batch_first=True)
-        # Implementation of Feedforward model
         self.fc1 = nn.Linear(c1, cm)
         self.fc2 = nn.Linear(cm, c1)
 
@@ -215,7 +214,6 @@ class AIFI(TransformerEncoderLayer):
         """
         c, h, w = x.shape[1:]
         pos_embed = self.build_2d_sincos_position_embedding(w, h, c)
-        # Flatten [B, C, H, W] to [B, HxW, C]
         x = super().forward(x.flatten(2).permute(0, 2, 1), pos=pos_embed.to(device=x.device, dtype=x.dtype))
         return x.permute(0, 2, 1).view([-1, c, h, w]).contiguous()
 
@@ -310,7 +308,7 @@ class TransformerBlock(nn.Module):
         self.conv = None
         if c1 != c2:
             self.conv = Conv(c1, c2)
-        self.linear = nn.Linear(c2, c2)  # learnable position embedding
+        self.linear = nn.Linear(c2, c2)
         self.tr = nn.Sequential(*(TransformerLayer(c2, num_heads) for _ in range(num_layers)))
         self.c2 = c2
 
@@ -493,7 +491,6 @@ class MSDeformAttn(nn.Module):
         if d_model % n_heads != 0:
             raise ValueError(f"d_model must be divisible by n_heads, but got {d_model} and {n_heads}")
         _d_per_head = d_model // n_heads
-        # Better to set _d_per_head to a power of 2 which is more efficient in a CUDA implementation
         assert _d_per_head * n_heads == d_model, "`d_model` must be divisible by `n_heads`"
 
         self.im2col_step = 64
@@ -568,7 +565,6 @@ class MSDeformAttn(nn.Module):
         sampling_offsets = self.sampling_offsets(query).view(bs, len_q, self.n_heads, self.n_levels, self.n_points, 2)
         attention_weights = self.attention_weights(query).view(bs, len_q, self.n_heads, self.n_levels * self.n_points)
         attention_weights = F.softmax(attention_weights, -1).view(bs, len_q, self.n_heads, self.n_levels, self.n_points)
-        # N, Len_q, n_heads, n_levels, n_points, 2
         num_points = refer_bbox.shape[-1]
         if num_points == 2:
             offset_normalizer = torch.as_tensor(value_shapes, dtype=query.dtype, device=query.device).flip(-1)
@@ -633,17 +629,14 @@ class DeformableTransformerDecoderLayer(nn.Module):
         """
         super().__init__()
 
-        # Self attention
         self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
-        # Cross attention
         self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
         self.dropout2 = nn.Dropout(dropout)
         self.norm2 = nn.LayerNorm(d_model)
 
-        # FFN
         self.linear1 = nn.Linear(d_model, d_ffn)
         self.act = act
         self.dropout3 = nn.Dropout(dropout)
@@ -695,7 +688,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
         Returns:
             (torch.Tensor): Output tensor after decoder layer.
         """
-        # Self attention
         q = k = self.with_pos_embed(embed, query_pos)
         tgt = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), embed.transpose(0, 1), attn_mask=attn_mask)[
             0
@@ -703,14 +695,12 @@ class DeformableTransformerDecoderLayer(nn.Module):
         embed = embed + self.dropout1(tgt)
         embed = self.norm1(embed)
 
-        # Cross attention
         tgt = self.cross_attn(
             self.with_pos_embed(embed, query_pos), refer_bbox.unsqueeze(2), feats, shapes, padding_mask
         )
         embed = embed + self.dropout2(tgt)
         embed = self.norm2(embed)
 
-        # FFN
         return self.forward_ffn(embed)
 
 
@@ -749,10 +739,10 @@ class DeformableTransformerDecoder(nn.Module):
 
     def forward(
         self,
-        embed: torch.Tensor,  # decoder embeddings
-        refer_bbox: torch.Tensor,  # anchor
-        feats: torch.Tensor,  # image features
-        shapes: list,  # feature shapes
+        embed: torch.Tensor,
+        refer_bbox: torch.Tensor,
+        feats: torch.Tensor,
+        shapes: list,
         bbox_head: nn.Module,
         score_head: nn.Module,
         pos_mlp: nn.Module,

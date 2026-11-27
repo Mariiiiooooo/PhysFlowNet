@@ -1,14 +1,7 @@
 #!/bin/bash
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-# Download COCO 2017 dataset https://cocodataset.org
-# Example usage: bash data/scripts/get_coco.sh
-# parent
-# ├── ultralytics
-# └── datasets
-#     └── coco  ← downloads here
 
-# Arguments (optional) Usage: bash data/scripts/get_coco.sh --train --val --test --segments
 if [ "$#" -gt 0 ]; then
   for opt in "$@"; do
     case "${opt}" in
@@ -27,35 +20,33 @@ else
   sama=false
 fi
 
-# Download/unzip labels
-d='../datasets' # unzip directory
+d='../datasets'
 url=https://github.com/ultralytics/assets/releases/download/v0.0.0/
 if [ "$segments" == "true" ]; then
-  f='coco2017labels-segments.zip' # 169 MB
+  f='coco2017labels-segments.zip'
 elif [ "$sama" == "true" ]; then
-  f='coco2017labels-segments-sama.zip' # 199 MB https://www.sama.com/sama-coco-dataset/
+  f='coco2017labels-segments-sama.zip'
 else
-  f='coco2017labels.zip' # 46 MB
+  f='coco2017labels.zip'
 fi
 echo 'Downloading' $url$f ' ...'
 curl -L $url$f -o $f -# && unzip -q $f -d $d && rm $f &
 
-# Download/unzip images
-d='../datasets/coco/images' # unzip directory
+d='../datasets/coco/images'
 url=http://images.cocodataset.org/zips/
 if [ "$train" == "true" ]; then
-  f='train2017.zip' # 19G, 118k images
+  f='train2017.zip'
   echo 'Downloading' $url$f '...'
   curl -L $url$f -o $f -# && unzip -q $f -d $d && rm $f &
 fi
 if [ "$val" == "true" ]; then
-  f='val2017.zip' # 1G, 5k images
+  f='val2017.zip'
   echo 'Downloading' $url$f '...'
   curl -L $url$f -o $f -# && unzip -q $f -d $d && rm $f &
 fi
 if [ "$test" == "true" ]; then
-  f='test2017.zip' # 7G, 41k images (optional)
+  f='test2017.zip'
   echo 'Downloading' $url$f '...'
   curl -L $url$f -o $f -# && unzip -q $f -d $d && rm $f &
 fi
-wait # finish background tasks
+wait

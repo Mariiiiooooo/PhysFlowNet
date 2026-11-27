@@ -79,7 +79,7 @@ class SAM(Model):
             >>> sam = SAM("sam_b.pt")
             >>> sam._load("path/to/custom_weights.pt")
         """
-        from .build import build_sam  # slow import
+        from .build import build_sam
 
         self.model = build_sam(weights)
 

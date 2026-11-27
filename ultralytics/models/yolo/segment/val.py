@@ -76,7 +76,6 @@ class SegmentationValidator(DetectionValidator):
         super().init_metrics(model)
         if self.args.save_json:
             check_requirements("faster-coco-eval>=1.6.7")
-        # More accurate vs faster
         self.process = ops.process_mask_native if self.args.save_json or self.args.save_txt else ops.process_mask
 
     def get_desc(self) -> str:
@@ -105,9 +104,9 @@ class SegmentationValidator(DetectionValidator):
         Returns:
             list[dict[str, torch.Tensor]]: Processed detection predictions with masks.
         """
-        proto = preds[1][-1] if len(preds[1]) == 3 else preds[1]  # second output is len 3 if pt, but only 1 if exported
+        proto = preds[1][-1] if len(preds[1]) == 3 else preds[1]
         preds = super().postprocess(preds[0])
-        imgsz = [4 * x for x in proto.shape[2:]]  # get image size from proto
+        imgsz = [4 * x for x in proto.shape[2:]]
         for i, pred in enumerate(preds):
             coefficient = pred.pop("extra")
             pred["masks"] = (
@@ -175,7 +174,7 @@ class SegmentationValidator(DetectionValidator):
         else:
             iou = mask_iou(batch["masks"].flatten(1), preds["masks"].flatten(1))
             tp_m = self.match_predictions(preds["cls"], gt_cls, iou).cpu().numpy()
-        tp.update({"tp_m": tp_m})  # update tp with mask IoU
+        tp.update({"tp_m": tp_m})
         return tp
 
     def plot_predictions(self, batch: dict[str, Any], preds: list[dict[str, torch.Tensor]], ni: int) -> None:
@@ -192,7 +191,7 @@ class SegmentationValidator(DetectionValidator):
             if masks.shape[0] > self.args.max_det:
                 LOGGER.warning(f"Limiting validation plots to 'max_det={self.args.max_det}' items.")
             p["masks"] = torch.as_tensor(masks[: self.args.max_det], dtype=torch.uint8).cpu()
-        super().plot_predictions(batch, preds, ni, max_det=self.args.max_det)  # plot bboxes
+        super().plot_predictions(batch, preds, ni, max_det=self.args.max_det)
 
     def save_one_txt(self, predn: torch.Tensor, save_conf: bool, shape: tuple[int, int], file: Path) -> None:
         """
@@ -235,7 +234,7 @@ class SegmentationValidator(DetectionValidator):
             rles = pool.map(single_encode, pred_masks)
         super().pred_to_json(predn, pbatch)
         for i, r in enumerate(rles):
-            self.jdict[-len(rles) + i]["segmentation"] = r  # segmentation
+            self.jdict[-len(rles) + i]["segmentation"] = r
 
     def scale_preds(self, predn: dict[str, torch.Tensor], pbatch: dict[str, Any]) -> dict[str, torch.Tensor]:
         """Scales predictions to the original image size."""
@@ -250,10 +249,10 @@ class SegmentationValidator(DetectionValidator):
 
     def eval_json(self, stats: dict[str, Any]) -> dict[str, Any]:
         """Return COCO-style instance segmentation evaluation metrics."""
-        pred_json = self.save_dir / "predictions.json"  # predictions
+        pred_json = self.save_dir / "predictions.json"
         anno_json = (
             self.data["path"]
             / "annotations"
             / ("instances_val2017.json" if self.is_coco else f"lvis_v1_{self.args.split}.json")
-        )  # annotations
+        )
         return super().coco_evaluate(stats, pred_json, anno_json, ["bbox", "segm"], suffix=["Box", "Mask"])

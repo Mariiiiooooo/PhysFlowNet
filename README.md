@@ -49,7 +49,7 @@ yolo detect predict model=/path/to/best.pt source=/path/to/images
 
 ## Reproducing the paper
 
-This repository contains the selected research implementation and its model config. The training command uses the paper's reported 300-epoch schedule. Local scripts associated with the original source directory used 400 epochs for some runs.
+This repository contains the selected research implementation and its model config. The training command uses the paper's reported 300-epoch schedule.
 
 This implementation samples ground-truth box centers for SCML and adds an auxiliary cosine-alignment term. The paper describes SCML on assigner-selected foreground anchors. The retained YAML most closely matches the paper's reported model size among the checked local configs.
 
